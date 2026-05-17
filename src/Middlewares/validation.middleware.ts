@@ -26,6 +26,8 @@ export const validationMiddleware = (schema: SchemaType) => {
             message: issue.message,
           }))
           validationErrors.push({ key, issues })
+        } else {
+          ;(req as any)[key] = result.data
         }
       }
     }

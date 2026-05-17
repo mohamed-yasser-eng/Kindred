@@ -1,11 +1,11 @@
 import { Request } from 'express'
 import { JwtPayload } from 'jsonwebtoken'
 import { Document, Types } from 'mongoose'
-import { ChatTypeEnum, FriendShipStatusEnum, GenderEnum, OtpTypesEnum, ProviderEnum, RoleEnum } from '../Enums/user.enum'
+import { ChatTypeEnum, FriendShipStatusEnum, GenderEnum, OtpTypesEnum, ProviderEnum, ReactTypeEnum, RoleEnum } from '../Enums/user.enum'
 
 interface IOTP {
   value: string
-  expiresAt: number
+  expiresAt: Date
   OTPType: OtpTypesEnum
 }
 
@@ -47,6 +47,7 @@ interface IFriendShip extends Document {
   requestFromId: Types.ObjectId
   requestToId: Types.ObjectId
   status: FriendShipStatusEnum
+  friendshipKey?: string
 }
 
 interface IMessage extends Document {
@@ -60,6 +61,7 @@ interface IConversation extends Document {
   type: ChatTypeEnum
   name?: String
   members: Types.ObjectId[]
+  directKey?: string
 }
 
 interface IPost extends Document {
@@ -80,5 +82,11 @@ interface IComment extends Document {
   onModel: string
 }
 
-export { IBlackListedToken, IComment, IConversation, IEmailArgument, IFriendShip, IMessage, IPost, IRequest, IUser }
+interface IReact extends Document {
+  type: ReactTypeEnum
+  ownerId: Types.ObjectId
+  refId: Types.ObjectId
+  onModel: string
+}
 
+export { IBlackListedToken, IComment, IConversation, IEmailArgument, IFriendShip, IMessage, IPost, IReact, IRequest, IUser }

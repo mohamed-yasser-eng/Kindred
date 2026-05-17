@@ -23,6 +23,10 @@ export abstract class BaseRepository<T> {
     return await this.model.findByIdAndDelete(id)
   }
 
+  async deleteDocuments(filters: FilterQuery<T>) {
+    return await this.model.deleteMany(filters)
+  }
+
   
   async updateDocumentById(filters: FilterQuery<T>, updatedObject?: UpdateQuery<T>, options?: QueryOptions<T>){
     return await this.model.findOneAndUpdate(filters, updatedObject, options)

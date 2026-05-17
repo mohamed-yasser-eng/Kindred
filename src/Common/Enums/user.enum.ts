@@ -30,5 +30,12 @@ enum ChatTypeEnum {
   GROUP = 'group',
 }
 
-export { ChatTypeEnum, FriendShipStatusEnum, GenderEnum, OtpTypesEnum, ProviderEnum, RoleEnum };
+enum ReactTypeEnum {
+  LIKE = 'like',
+  LOVE = 'love',
+  HAHA = 'haha',
+  SAD = 'sad',
+  ANGRY = 'angry',
+}
 
+export { ChatTypeEnum, FriendShipStatusEnum, GenderEnum, OtpTypesEnum, ProviderEnum, ReactTypeEnum, RoleEnum };

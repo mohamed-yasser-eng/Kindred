@@ -9,25 +9,34 @@ import {
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import fs, { ReadStream } from 'fs'
+import { unlink } from 'fs/promises'
 
 interface IPutObjectCommandInput extends PutObjectCommandInput {
   Body: string | Buffer | ReadStream
 }
 
-export class S3ClientServicce {
+export class S3ClientService {
   private s3Client = new S3Client({
     region: process.env.AWS_REGION as string,
-    endpoint: process.env.S3_ENDPOINT, // ✅ use LocalStack
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
     },
-    forcePathStyle: true, // ✅ CRITICAL for localhost
   })
 
   private key_folder = process.env.AWS_KEY_FOLDER as string
 
-  async getFileWithSignedUrl(key: string, expiresIn: number = 60) {
+  private async deleteLocalFile(filePath?: string) {
+    if (!filePath) return
+
+    try {
+      await unlink(filePath)
+    } catch (error) {
+      console.warn('Failed to delete local upload file', error)
+    }
+  }
+
+  async getFileWithSignedUrl(key: string, expiresIn: number = 300) {
     const getCommand = new GetObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME as string,
       Key: key,
@@ -38,8 +47,6 @@ export class S3ClientServicce {
 
   async uploadFileOnS3(file: Express.Multer.File, key: string) {
     const keyName = `${this.key_folder}/${key}/${Date.now()}-${file.originalname}`
-    // console.log(`the keyname is `, keyName)
-    // console.log(`the file into`, file)
 
     const params: IPutObjectCommandInput = {
       Bucket: process.env.AWS_S3_BUCKET_NAME as string,
@@ -50,15 +57,33 @@ export class S3ClientServicce {
 
     const putCommand = new PutObjectCommand(params)
 
-    await this.s3Client.send(putCommand)
-    const signedUrl = await this.getFileWithSignedUrl(keyName)
-    return { key: keyName, url: signedUrl }
+    try {
+      await this.s3Client.send(putCommand)
+      const signedUrl = await this.getFileWithSignedUrl(keyName)
+      return { key: keyName, url: signedUrl }
+    } finally {
+      await this.deleteLocalFile(file.path)
+    }
   }
 
-
   async uploadFilesOnS3(files: Express.Multer.File[], key: string) {
-    const keys = files.map(file => this.uploadFileOnS3(file, key))
-    return await Promise.all(keys)
+    const uploadedFiles: { key: string; url: string }[] = []
+
+    try {
+      for (const file of files) {
+        uploadedFiles.push(await this.uploadFileOnS3(file, key))
+      }
+
+      return uploadedFiles
+    } catch (error) {
+      try {
+        await this.deleteBulkFromS3(uploadedFiles.map((file) => file.key))
+        await Promise.all(files.map((file) => this.deleteLocalFile(file.path)))
+      } catch (cleanupError) {
+        console.warn('Failed to clean up files after S3 upload failure', cleanupError)
+      }
+      throw error
+    }
   }
 
   async deleteFileFromS3(key: string) {
@@ -70,6 +95,8 @@ export class S3ClientServicce {
   }
 
   async deleteBulkFromS3(keys: string[]) {
+    if (!keys.length) return
+
     const deleteCommand = new DeleteObjectsCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME as string,
       Delete: {
@@ -92,15 +119,19 @@ export class S3ClientServicce {
     const upload = new Upload({
       client: this.s3Client,
       params,
-      queueSize: 4, // how many parts to upload in parallel
-      partSize: 5 * 1024 * 1024, // each part = 5 MB
-      leavePartsOnError: false, // auto-cleanup failed parts
+      queueSize: 4,
+      partSize: 5 * 1024 * 1024,
+      leavePartsOnError: false,
     })
 
     upload.on('httpUploadProgress', (progress) => {
       console.log(`Uploaded ${progress.loaded} bytes of ${progress.total}`)
     })
 
-    return await upload.done()
+    try {
+      return await upload.done()
+    } finally {
+      await this.deleteLocalFile(file.path)
+    }
   }
 }

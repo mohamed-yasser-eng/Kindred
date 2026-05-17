@@ -17,7 +17,12 @@ export class ChatService {
 
         // console.log('join private called ')
 
-        let conversation = await this.conversationRepo.findOneDocument({ type: ChatTypeEnum.DIRECT, members: { $all: [socket.data.userId, targetUserId] } })
+        if (socket.data.userId === targetUserId) throw new BadRequestException('You cannot start a direct chat with yourself')
+
+        const directMembers = [socket.data.userId, targetUserId].sort()
+        const directKey = directMembers.join(':')
+
+        let conversation = await this.conversationRepo.findOneDocument({ type: ChatTypeEnum.DIRECT, directKey })
 
         // console.log('search for conversation result', conversation);
 
@@ -25,7 +30,7 @@ export class ChatService {
 
         if (!conversation) {
             console.log('creating new conversation');
-            conversation = await this.conversationRepo.createNewDocument({ type: ChatTypeEnum.DIRECT, members: [socket.data.userId, targetUserId] })
+            conversation = await this.conversationRepo.createNewDocument({ type: ChatTypeEnum.DIRECT, members: directMembers, directKey })
         }
         socket.join(conversation._id.toString())
         return conversation
@@ -55,8 +60,12 @@ export class ChatService {
     }
 
     async joinGroupChat(socket: Socket, targetGroupId: string) {
-        let conversation = await this.conversationRepo.findOneDocument({ _id: targetGroupId, type: ChatTypeEnum.GROUP })
-        if (!conversation) throw new BadRequestException('Group ID doesnt exist')
+        let conversation = await this.conversationRepo.findOneDocument({
+            _id: targetGroupId,
+            type: ChatTypeEnum.GROUP,
+            members: socket.data.userId,
+        })
+        if (!conversation) throw new BadRequestException('Group not found or you are not a member')
         socket.join(conversation._id.toString())
         return conversation
 
@@ -75,6 +84,7 @@ export class ChatService {
 
 
     async getGroupHistory(socket: Socket, targetGroupId: string) {
+        await this.joinGroupChat(socket, targetGroupId)
         const messages = await this.messageRepo.findDocuments({ conversationId: targetGroupId })
         socket.emit('group-chat-history', messages)
     }

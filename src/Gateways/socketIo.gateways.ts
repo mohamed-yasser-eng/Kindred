@@ -1,7 +1,9 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from 'socket.io';
+import { consumeSocketRateLimit, socketAuthRateLimiter } from "../Middlewares";
 import { ChatInitiation } from "../Modules/Chat/chat";
-import { BadRequestException, verifyToken } from "../Utils";
+import { isOriginAllowed } from "../Utils/cors.utils";
+import { verifyToken } from "../Utils";
 
 
 
@@ -9,9 +11,25 @@ export const connectedSockets = new Map<string, string[]>()
 let io: Server | null = null
 
 
-function socketAuthentication(socket: Socket, next: Function) {
-        const token = socket.handshake.auth.authorization
-        const decodedData = verifyToken(token, process.env.JWT_ACCESS_SECRET as string)
+async function socketAuthentication(socket: Socket, next: Function) {
+        const authKey = socket.handshake.address || socket.id
+        const isAllowed = await consumeSocketRateLimit(socketAuthRateLimiter, authKey)
+        if (!isAllowed) return next(new Error('Too many socket connection attempts, please try again later'))
+
+        const authorization = socket.handshake.auth.authorization
+        if (!authorization) return next(new Error('Authentication token is required'))
+
+        const [Prefix, token] = authorization.split(' ')
+        if (Prefix !== process.env.JWT_PREFIX || !token) return next(new Error('Invalid authentication token format'))
+
+        let decodedData
+        try {
+            decodedData = verifyToken(token, process.env.JWT_ACCESS_SECRET as string)
+        } catch {
+            return next(new Error('Invalid or expired authentication token'))
+        }
+
+        if (!decodedData._id) return next(new Error('Invalid authentication token payload'))
         socket.data = { userId: decodedData._id }
 
         const userTabs = connectedSockets.get(socket.data.userId)
@@ -37,7 +55,14 @@ function socketDisconnection(socket: Socket) {
 
 export const ioInitializer = (server: HttpServer) => {
 
-    io = new Server(server, { cors: { origin: '*' } })
+    io = new Server(server, {
+        cors: {
+            origin: (origin, callback) => {
+                if (isOriginAllowed(origin)) return callback(null, true)
+                return callback(new Error('CORS origin is not allowed'))
+            },
+        },
+    })
     io.use(socketAuthentication)
     io.on('connection', (socket: Socket) => {
         console.log('Socket user connected: ', socket.data)

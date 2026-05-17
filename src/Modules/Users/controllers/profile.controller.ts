@@ -1,11 +1,19 @@
 import { Router } from 'express'
-import { authentication, Multer } from '../../../Middlewares'
+import { authentication, Multer, uploadRateLimitMiddleware, validationMiddleware } from '../../../Middlewares'
 import profileService from '../services/profile.service'
+import {
+  CreateGroupValidator,
+  ListFriendShipRequestsValidator,
+  RenewSignedUrlValidator,
+  RespondToFriendShipRequestValidator,
+  SendFriendShipRequestValidator,
+  UpdateProfileValidator,
+} from '../../../Validators'
 
 const profileController = Router()
 
 //update profile
-profileController.put('/update-profile', authentication, profileService.updateProfile)
+profileController.put('/update-profile', authentication, validationMiddleware(UpdateProfileValidator), profileService.updateProfile)
 
 //delete profile
 profileController.delete('/delete-account', authentication, profileService.deletAccount)
@@ -14,10 +22,10 @@ profileController.delete('/delete-account', authentication, profileService.delet
 // profileController.get("/profile-data",authentication,profileService.getProfileData)
 
 //upload profile picture
-profileController.post('/profile-picture', authentication, Multer().single('profilePicture'), profileService.uploadProfilePicture)
+profileController.post('/profile-picture', authentication, uploadRateLimitMiddleware, Multer().single('profilePicture'), profileService.uploadProfilePicture)
 
 //renew signed url
-profileController.post('/renew-signed-url', authentication, profileService.renewSignedUrl)
+profileController.post('/renew-signed-url', authentication, validationMiddleware(RenewSignedUrlValidator), profileService.renewSignedUrl)
 
 //upload cover picture
 // profileController.post("/cover-picture",authentication,Multer().single("coverPicture"),profileService.uploadCoverPicture)
@@ -26,15 +34,15 @@ profileController.post('/renew-signed-url', authentication, profileService.renew
 // profileController.get("/users",authentication,profileService.listUsers)
 
 // send friendship request
-profileController.post('/send-friendship-request', authentication, profileService.sendFriendShipRequest)
+profileController.post('/send-friendship-request', authentication, validationMiddleware(SendFriendShipRequestValidator), profileService.sendFriendShipRequest)
 
 //list friendship requests
-profileController.get('/list-friendship-requests', authentication, profileService.listRequests)
+profileController.get('/list-friendship-requests', authentication, validationMiddleware(ListFriendShipRequestsValidator), profileService.listRequests)
 
 //respond to friendship request
-profileController.patch('/respond-to-friendship-request', authentication, profileService.respondToFriendShipRequest)
+profileController.patch('/respond-to-friendship-request', authentication, validationMiddleware(RespondToFriendShipRequestValidator), profileService.respondToFriendShipRequest)
 
 
-profileController.post('/create-group', authentication, profileService.createGroup)
+profileController.post('/create-group', authentication, validationMiddleware(CreateGroupValidator), profileService.createGroup)
 
 export { profileController }

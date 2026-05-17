@@ -4,8 +4,8 @@ import * as uuid from 'uuid'
 import { IRequest, IUser, OtpTypesEnum, SignUpBodyType } from '../../../Common'
 import { BlackListedTokenModel, UserModel } from '../../../Db/Models'
 import { BlackListedTokenRepository, UserRepository } from '../../../Db/Repositories'
-import { compareHash, encrypt, generateHash, generateToken } from '../../../Utils'
-import { ConflictException } from '../../../Utils/Errors/exceptions.utils'
+import { compareHash, encrypt, generateHash, generateToken, verifyToken } from '../../../Utils'
+import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '../../../Utils/Errors/exceptions.utils'
 import { SuccessResponse } from '../../../Utils/Response/response-helper.utils'
 import { localEventEmitter } from '../../../Utils/Services/email.utils'
 
@@ -36,7 +36,7 @@ class AuthService {
 
     const confirmationOtp = {
       value: generateHash(OTP),
-      expiresAt: Date.now() + 600000, //otp expires in 10 minutes from now
+      expiresAt: new Date(Date.now() + 600000), //otp expires in 10 minutes from now
       OTPType: OtpTypesEnum.EMAIL_VERIFICATION,
     }
 
@@ -57,34 +57,30 @@ class AuthService {
   confirmEmail = async (req: Request, res: Response) => {
     const { email, otp } = req.body
 
-    if (!email || !otp) return res.status(400).json({ message: 'Email and OTP are required' })
+    if (!email || !otp) throw new BadRequestException('Email and OTP are required')
 
     const user: IUser | null = await this.userRepository.findOneDocument({
       email,
     })
 
-    if (!user) return res.status(404).json({ message: 'email doesnt exist in our records' })
+    if (!user) throw new NotFoundException('email doesnt exist in our records')
 
-    if (user.isVerified) return res.status(400).json({ message: 'Email is already verified' })
+    if (user.isVerified) throw new BadRequestException('Email is already verified')
 
     const emailOtp = user.OTPS?.find((o) => o.OTPType === OtpTypesEnum.EMAIL_VERIFICATION)
 
     if (!emailOtp) {
-      return res.status(400).json({ message: 'Verification OTP not found' })
+      throw new BadRequestException('Verification OTP not found')
     }
 
-    if (Date.now() > emailOtp.expiresAt) {
-      return res.status(400).json({
-        message: 'OTP has expired',
-      })
+    if (Date.now() > emailOtp.expiresAt.getTime()) {
+      throw new BadRequestException('OTP has expired')
     }
 
     const isOtpValid = compareHash(otp, emailOtp.value)
 
     if (!isOtpValid) {
-      return res.status(400).json({
-        message: 'Invalid OTP',
-      })
+      throw new BadRequestException('Invalid OTP')
     }
 
     user.isVerified = true
@@ -94,9 +90,7 @@ class AuthService {
 
     await user.save()
 
-    return res.status(200).json({
-      message: 'Email verified successfully',
-    })
+    return res.status(200).json(SuccessResponse('Email verified successfully', 200))
   }
 
   signIn = async (req: Request, res: Response) => {
@@ -105,10 +99,11 @@ class AuthService {
     const user: IUser | null = await this.userRepository.findOneDocument({
       email,
     })
-    if (!user) return res.status(401).json({ message: 'User not found, please signup first.' })
+    if (!user) throw new UnauthorizedException('User not found, please signup first.')
 
     const isPasswordMatched = compareHash(password, user.password as string)
-    if (!isPasswordMatched) return res.status(401).json({ message: 'Invalid credentials, please try again.' })
+    if (!isPasswordMatched) throw new UnauthorizedException('Invalid credentials, please try again.')
+    if (!user.isVerified) throw new UnauthorizedException('Please verify your email before signing in.')
 
     const accessToken = generateToken(
       {
@@ -140,24 +135,61 @@ class AuthService {
       },
     )
 
-    return res.status(200).json({
-      message: 'User signed in successfully',
-      data: { accessToken, refreshToken },
-    })
+    return res.status(200).json(SuccessResponse('User signed in successfully', 200, { accessToken, refreshToken }))
+  }
+
+
+  
+  refreshToken = async (req: Request, res: Response) => {
+    const { authorization } = req.headers
+    if (!authorization) throw new UnauthorizedException('Refresh token is required')
+
+    const [Prefix, token] = authorization.split(' ')
+    if (Prefix !== process.env.JWT_PREFIX || !token) throw new UnauthorizedException('Invalid refresh token format')
+
+    let decodedData
+    try {
+      decodedData = verifyToken(token, process.env.JWT_REFRESH_SECRET as string)
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token')
+    }
+    if (!decodedData._id) throw new UnauthorizedException('Invalid refresh token payload')
+
+    const blackListedToken = await this.blackListedTokenRepository.findOneDocument({ tokenId: decodedData.jti })
+    if (blackListedToken) throw new UnauthorizedException('User session expired, login again.')
+
+    const user: IUser | null = await this.userRepository.findDocumentById(decodedData._id, '-password')
+    if (!user) throw new NotFoundException('User not found, please signup first.')
+
+    const accessToken = generateToken(
+      {
+        _id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        provider: user.provider,
+        role: user.role,
+      },
+      process.env.JWT_ACCESS_SECRET as string,
+      {
+        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'],
+        jwtid: uuid.v4(),
+      },
+    )
+
+    return res.status(200).json(SuccessResponse('Access token refreshed successfully', 200, { accessToken }))
   }
 
   signOut = async (req: Request, res: Response) => {
     const {
       token: { jti, exp },
     } = (req as unknown as IRequest).loggedInUser
+    const expiresAt = exp ? new Date(exp * 1000) : new Date(Date.now() + 600000)
     const blackListedToken = await this.blackListedTokenRepository.createNewDocument({
       tokenId: jti,
-      expiresAt: new Date(exp || Date.now() + 600000),
+      expiresAt,
     })
-    res.status(200).json({
-      message: 'User signed out successfully',
-      data: { blackListedToken },
-    })
+    res.status(200).json(SuccessResponse('User signed out successfully', 200, { blackListedToken }))
   }
 }
 

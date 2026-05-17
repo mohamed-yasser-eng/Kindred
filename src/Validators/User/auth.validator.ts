@@ -2,6 +2,8 @@ import { isValidObjectId } from 'mongoose'
 import z from 'zod'
 import { GenderEnum } from '../../Common'
 
+const objectId = z.string().refine((value) => isValidObjectId(value), 'invalid object id')
+
 export const SignUpValidator = {
   body: z
     .strictObject({
@@ -11,7 +13,7 @@ export const SignUpValidator = {
       password: z.string().min(6),
       passwordConfirmation: z.string().min(6),
       gender: z.enum(GenderEnum),
-      DOB: z.date().optional(),
+      DOB: z.coerce.date().optional(),
       phoneNumber: z.string().min(11).max(11),
       userId: z.string().optional(),
     })
@@ -33,3 +35,25 @@ export const SignUpValidator = {
       }
     }),
 }
+
+export const ConfirmEmailValidator = {
+  body: z.strictObject({
+    email: z.string().email(),
+    otp: z.string().length(6),
+  }),
+}
+
+export const SignInValidator = {
+  body: z.strictObject({
+    email: z.string().email(),
+    password: z.string().min(6),
+  }),
+}
+
+export const RefreshTokenValidator = {
+  headers: z.object({
+    authorization: z.string().min(1),
+  }).passthrough(),
+}
+
+export { objectId }

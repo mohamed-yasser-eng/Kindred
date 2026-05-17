@@ -1,21 +1,16 @@
 export interface IMetaResponse {
   status: number
   success: boolean
-}
-
-export interface IDataResponse {
   message: string
-  data?: unknown
 }
 
 export interface IErrorDataResponse {
-  message: string
   context?: object
 }
 
-export interface ISuccessResponse {
+export interface ISuccessResponse<T = unknown> {
   meta: IMetaResponse
-  data?: IDataResponse
+  data?: T
 }
 
 export interface IFailedResponse {

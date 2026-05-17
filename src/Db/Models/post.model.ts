@@ -6,10 +6,13 @@ import mongoosePaginate from 'mongoose-paginate-v2'
 const postSchema = new mongoose.Schema<IPost>({
     description: String,
     attachments: [String],
-    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     allowComments: { type: Boolean, default: true },
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-})
+}, { timestamps: true })
+
+postSchema.index({ ownerId: 1, createdAt: -1 })
+postSchema.index({ createdAt: -1 })
 
 postSchema.plugin(mongoosePaginate)
 export const PostModel = mongoose.model<IPost, PaginateModel<IPost>>('Post', postSchema)

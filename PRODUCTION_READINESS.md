@@ -6,168 +6,105 @@ This document tracks what is missing before the backend is production-ready and 
 
 - TypeScript compile check passes with `npx tsc --noEmit`.
 - The project is not production-ready yet.
-- Main blockers are missing production scripts, incomplete features, weak validation, security hardening, missing tests, and missing integration documentation.
+- Main blockers are deployment config, automated tests, frontend/client contract, and one remaining dependency audit advisory.
 
 ## Critical Gaps
 
-- [ ] Add real production scripts in `package.json`.
-  - Missing: `build`, `start`, `dev`, `test`, and optionally `lint`.
-  - Current `test` script always fails.
+- [x] Add real production scripts in `package.json`.
 
-- [ ] Fix OTP expiry field mismatch.
-  - `auth.service.ts` creates `expiresAt`.
-  - `user.model.ts` defines `expiredAt`.
-  - This means OTP expiry is not persisted consistently.
+- [x] Fix OTP expiry field mismatch.
 
-- [ ] Fix sign-out blacklist expiry.
-  - JWT `exp` is in seconds.
-  - `new Date(exp)` treats the value as milliseconds.
-  - Token blacklist expiry will be wrong unless converted with `exp * 1000`.
+- [x] Fix sign-out blacklist expiry.
 
-- [ ] Add refresh-token endpoint.
-  - Refresh tokens are generated during sign-in.
-  - There is no endpoint to rotate refresh tokens or issue a new access token.
+- [x] Add refresh-token endpoint.
 
-- [ ] Enforce email verification before sign-in.
-  - Currently unverified users can sign in.
+- [x] Enforce email verification before sign-in.
 
-- [ ] Wrap JWT verification in safe error handling.
-  - `authentication.middleware.ts` can throw on invalid or expired JWT.
-  - Socket auth has the same issue in `socketIo.gateways.ts`.
+- [x] Wrap JWT verification in safe error handling.
 
-- [ ] Protect socket group access.
-  - Any authenticated socket can currently join/read/send to any group by ID.
-  - Group membership must be checked before joining or sending messages.
+- [x] Protect socket group access.
 
 ## Feature Gaps
 
-- [ ] Implement comments module.
-  - `comment.controller.ts` is currently empty.
-  - `comment.service.ts` is currently empty.
+- [x] Implement comments module.
 
-- [ ] Implement reacts module.
-  - `react.controller.ts` is currently empty.
-  - `react.service.ts` is currently empty.
+- [x] Implement reacts module.
 
-- [ ] Implement profile update.
-  - `profile.service.ts` has an empty `updateProfile` method.
+- [x] Implement profile update.
 
-- [ ] Implement post update.
+- [x] Implement post update.
 
-- [ ] Implement post delete.
+- [x] Implement post delete.
 
-- [ ] Implement get user posts.
+- [x] Implement get user posts.
 
-- [ ] Decide what to do with GraphQL.
-  - `src/GraphQl/main.gql.ts` exists but is empty.
-  - Either implement and mount it or remove it from the production scope.
+- [x] Decide what to do with GraphQL.
+  - Implemented and mounted as a read/query layer at `/graphql`.
+  - REST remains responsible for auth, uploads, mutations, comments, reacts, friendships, and post writes.
+
+## GraphQL Feature Ideas
+
+GraphQL should be used as a read/query layer for nested frontend screens, not as a full replacement for the existing REST API. Keep auth, uploads, post creation/update/delete, comments, reacts, and friendship mutations in REST for now.
+
+- [x] Feed query.
+
+- [x] Profile dashboard query.
+
+- [x] Single post details query.
+
+- [x] Conversations metadata query.
 
 ## Security And Stability Gaps
 
-- [ ] Restrict CORS.
-  - HTTP CORS currently allows all origins.
-  - Socket.IO CORS currently allows all origins.
+- [x] Restrict CORS.
 
-- [ ] Add upload hardening.
-  - File size limits.
-  - MIME type validation.
-  - Extension validation.
-  - Temp file cleanup after S3 upload.
-  - Better error handling for failed uploads.
+- [x] Add upload hardening.
 
-- [ ] Avoid exposing raw internal errors to clients.
-  - Current global error handler may return internal error objects.
+- [x] Avoid exposing raw internal errors to clients.
 
-- [ ] Add rate limiting.
-  - Sign-in.
-  - Signup.
-  - OTP confirmation.
-  - Upload endpoints.
-  - Socket connection/auth events.
+- [x] Add rate limiting.
 
-- [ ] Add security headers.
-  - Use `helmet` or equivalent middleware.
+- [x] Add security headers.
 
-- [ ] Add request body size limits.
-  - Example: `express.json({ limit: '...' })`.
+- [x] Add request body size limits.
 
-- [ ] Add startup environment validation.
-  - Validate required env vars before starting the server.
-  - Fail fast with a clear message if configuration is missing or invalid.
+- [x] Add startup environment validation.
 
-- [ ] Add `.env.example`.
-  - Needed for integration and deployment.
-  - Should list variable names but never real secrets.
+- [x] Add `.env.example`.
 
-- [ ] Rotate secrets if `.env` was ever committed.
-  - `.env` is ignored now, but secrets may be exposed if previously committed.
+- [x] Rotate secrets if `.env` was ever committed.
+  - Local git history check found no `.env` commits.
+  - `.env` is ignored now.
+
+
 
 ## Database Gaps
 
-- [ ] Add timestamps to main schemas.
-  - Users.
-  - Posts.
-  - Comments.
-  - Friendships.
-  - Conversations.
-  - Messages.
+- [x] Add timestamps to main schemas.
 
-- [ ] Add required constraints where needed.
-  - Example: `ownerId` on posts should likely be required.
+- [x] Add required constraints where needed.
 
-- [ ] Add feed/query indexes.
-  - Posts by owner.
-  - Posts by created date.
-  - Messages by conversation.
-  - Friendships by requester/receiver/status.
+- [x] Add feed/query indexes.
 
-- [ ] Add TTL index for blacklisted tokens.
-  - `expiresAt` should automatically remove expired blacklist records.
+- [x] Add TTL index for blacklisted tokens.
 
-- [ ] Prevent duplicate friendship requests.
-  - Add logic and/or indexes.
-  - Block self-requests.
+- [x] Prevent duplicate friendship requests.
 
-- [ ] Prevent duplicate direct conversations.
-  - Use canonical member ordering and a unique index.
+- [x] Prevent duplicate direct conversations.
 
-- [ ] Improve account deletion cleanup.
-  - Delete or anonymize related posts.
-  - Delete comments.
-  - Delete friendships.
-  - Handle conversations/messages.
-  - Delete all related S3 files, not only profile picture.
+- [x] Improve account deletion cleanup.
 
 ## Integration Gaps
 
-- [ ] Add API documentation.
-  - OpenAPI/Swagger or Postman collection.
+- [x] Add API documentation.
 
-- [ ] Standardize response shape.
-  - Some routes use `SuccessResponse`.
-  - Other routes return raw `{ message }`.
+- [x] Standardize response shape.
 
-- [ ] Add route validators.
-  - Sign-in.
-  - Confirm email.
-  - Profile update.
-  - Renew signed URL.
-  - Friendship request.
-  - Friendship response.
-  - Create group.
-  - Post create/update/delete.
-  - Comments.
-  - Reacts.
+- [x] Add route validators.
 
-- [ ] Add socket event validation.
-  - `send-private-message`.
-  - `get-chat-history`.
-  - `send-group-message`.
-  - `get-group-chat`.
+- [x] Add socket event validation.
 
-- [ ] Add health check endpoint.
-  - Example: `GET /health`.
-  - Should confirm server is running and optionally database is reachable.
+- [x] Add health check endpoint.
 
 - [ ] Add deployment config.
   - Dockerfile.
@@ -193,13 +130,7 @@ This document tracks what is missing before the backend is production-ready and 
 
 ## Suggested Work Order
 
-1. Add production scripts, `.env.example`, startup env validation, and health check.
-2. Fix OTP expiry and token blacklist expiry.
-3. Harden auth: verified-only login, refresh-token flow, JWT error handling, and rate limits.
-4. Add validators for all existing routes and socket events.
-5. Implement missing core modules: comments, reacts, profile update, post update/delete.
-6. Harden uploads and S3 cleanup.
-7. Add database timestamps, indexes, TTL indexes, and duplicate prevention.
-8. Add API docs and frontend integration contract.
-9. Add automated tests and CI checks.
-
+1. Add deployment config.
+2. Add frontend/client contract.
+3. Add automated tests and CI checks.
+4. Decide whether to force-upgrade `nodemailer` or explicitly accept the remaining moderate audit advisory.
