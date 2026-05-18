@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import './Config/env.config'
-import fs from 'fs'
 import cors from 'cors'
 import helmet from 'helmet'
 import multer from 'multer'
@@ -39,9 +38,7 @@ app.use(express.json({ limit: '1mb' }))
 
 app.use(rateLimitMiddleware)
 
-var accesLogStream = fs.createWriteStream('access.log') 
-
-app.use(morgan('dev', { stream: accesLogStream }))
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 
 app.get('/health', (_req: Request, res: Response) => {
   const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
