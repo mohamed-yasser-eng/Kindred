@@ -3,6 +3,7 @@ import { IComment, IRequest } from '../../../Common'
 import { CommentModel } from '../../../Db/Models'
 import { CommentRepository, PostRepository } from '../../../Db/Repositories'
 import { BadRequestException, NotFoundException } from '../../../Utils'
+import { deleteCommentTree } from '../../../Utils/Comments/comment-cleanup.utils'
 import { SuccessResponse } from '../../../Utils/Response/response-helper.utils'
 
 class CommentService {
@@ -94,7 +95,7 @@ class CommentService {
     const comment = await this.commentRepo.findOneDocument({ _id: commentId, ownerId: _id })
     if (!comment) throw new NotFoundException('Comment not found')
 
-    await this.commentRepo.deleteByIdDocument(comment._id)
+    await deleteCommentTree([comment._id.toString()])
 
     return res.status(200).json(SuccessResponse('Comment deleted successfully', 200))
   }

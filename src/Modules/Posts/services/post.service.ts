@@ -4,6 +4,7 @@ import { IRequest } from "../../../Common";
 import { CommentModel, FriendShipModel, ReactModel, UserModel } from "../../../Db/Models";
 import { CommentRepository, FriendShipRepository, PostRepository, ReactRepository, UserRepository } from "../../../Db/Repositories";
 import { BadRequestException, NotFoundException, S3ClientService } from "../../../Utils";
+import { deleteCommentTree } from "../../../Utils/Comments/comment-cleanup.utils";
 import { pagination } from "../../../Utils/Pagination/pagination.utils";
 import { SuccessResponse } from "../../../Utils/Response/response-helper.utils";
 
@@ -82,7 +83,7 @@ class PostService {
         // const { user: { _id } } = (req as IRequest).loggedInUser
         const { page, limit } = req.query
         const { limit: currentLimit, skip } = pagination({ page: Number(page), limit: Number(limit) })
-        const posts = await this.postRepo.postsPagination({}, {})
+        const posts = await this.postRepo.postsPagination({}, { limit: currentLimit, offset: skip, sort: { createdAt: -1 } })
         res.status(200).json(SuccessResponse('Posts fetched successfully', 200, { posts }))
     }
 
@@ -146,7 +147,8 @@ class PostService {
         const post = await this.postRepo.findOneDocument({ _id: postId, ownerId: _id })
         if (!post) throw new NotFoundException('Post not found')
 
-        await this.commentRepo.deleteDocuments({ refId: postId, onModel: 'Post' })
+        const directComments = await this.commentRepo.findDocuments({ refId: postId, onModel: 'Post' }, '_id')
+        await deleteCommentTree(directComments.map((comment) => comment._id.toString()))
         await this.reactRepo.deleteDocuments({ refId: postId, onModel: 'Post' })
         await this.postRepo.deleteByIdDocument(post._id)
 
@@ -169,7 +171,9 @@ class PostService {
         const user = await this.userRepo.findDocumentById(targetUserId as any, '_id')
         if (!user) throw new NotFoundException('User not found')
 
-        const posts = await this.postRepo.postsPagination({ ownerId: targetUserId }, {})
+        const { page, limit } = req.query
+        const { limit: currentLimit, skip } = pagination({ page: Number(page), limit: Number(limit) })
+        const posts = await this.postRepo.postsPagination({ ownerId: targetUserId }, { limit: currentLimit, offset: skip, sort: { createdAt: -1 } })
         res.status(200).json(SuccessResponse('User posts fetched successfully', 200, { posts }))
     }
 }
