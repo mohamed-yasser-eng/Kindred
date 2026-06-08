@@ -20,7 +20,7 @@ postController.delete('/:postId', authentication, validationMiddleware(PostIdPar
 postController.get('/home', authentication, validationMiddleware(ListHomePostsValidator), postService.listHomePages)
 
 // get user posts
-postController.get('/user/me', authentication, postService.listUserPosts)
+postController.get('/user/me', authentication, validationMiddleware(ListHomePostsValidator), postService.listUserPosts)
 postController.get('/user/:userId', authentication, validationMiddleware(UserPostsParamsValidator), postService.listUserPosts)
 
 
