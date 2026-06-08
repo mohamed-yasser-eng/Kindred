@@ -13,6 +13,32 @@ class AuthService {
   private userRepository: UserRepository = new UserRepository(UserModel)
   private blackListedTokenRepository: BlackListedTokenRepository = new BlackListedTokenRepository(BlackListedTokenModel)
 
+  private toAuthUserResponse(user: IUser) {
+    return {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      gender: user.gender,
+      DOB: user.DOB,
+      profilePicture: user.profilePicture,
+      coverPicture: user.coverPicture,
+      provider: user.provider,
+      role: user.role,
+      isVerified: user.isVerified,
+    }
+  }
+
+  private async blacklistToken(tokenId: string | undefined, expiresAt: Date) {
+    if (!tokenId) throw new UnauthorizedException('Invalid token payload')
+
+    await this.blackListedTokenRepository.updateDocumentById(
+      { tokenId },
+      { tokenId, expiresAt },
+      { upsert: true, setDefaultsOnInsert: true },
+    )
+  }
+
   signUp = async (req: Request, res: Response) => {
     const { firstName, lastName, email, password, gender, phoneNumber, DOB }: SignUpBodyType = req.body
 
@@ -51,7 +77,7 @@ class AuthService {
       OTPS: [confirmationOtp],
     })
 
-    return res.status(201).json(SuccessResponse<IUser>('User registered successfully, please verify your email', 201, newUser))
+    return res.status(201).json(SuccessResponse('User registered successfully, please verify your email', 201, this.toAuthUserResponse(newUser)))
   }
 
   confirmEmail = async (req: Request, res: Response) => {
@@ -182,14 +208,27 @@ class AuthService {
 
   signOut = async (req: Request, res: Response) => {
     const {
+      user,
       token: { jti, exp },
     } = (req as unknown as IRequest).loggedInUser
-    const expiresAt = exp ? new Date(exp * 1000) : new Date(Date.now() + 600000)
-    const blackListedToken = await this.blackListedTokenRepository.createNewDocument({
-      tokenId: jti,
-      expiresAt,
-    })
-    res.status(200).json(SuccessResponse('User signed out successfully', 200, { blackListedToken }))
+    const { refreshToken } = req.body
+
+    let decodedRefreshToken
+    try {
+      decodedRefreshToken = verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET as string)
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token')
+    }
+
+    if (decodedRefreshToken._id !== user._id.toString()) throw new UnauthorizedException('Refresh token does not belong to the current user')
+
+    const accessTokenExpiresAt = exp ? new Date(exp * 1000) : new Date(Date.now() + 600000)
+    const refreshTokenExpiresAt = decodedRefreshToken.exp ? new Date(decodedRefreshToken.exp * 1000) : new Date(Date.now() + 600000)
+
+    await this.blacklistToken(jti, accessTokenExpiresAt)
+    await this.blacklistToken(decodedRefreshToken.jti, refreshTokenExpiresAt)
+
+    res.status(200).json(SuccessResponse('User signed out successfully', 200))
   }
 }
 

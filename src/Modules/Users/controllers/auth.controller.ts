@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import AuthService from '../services/auth.service'
 import { authRateLimitMiddleware, authentication, signinRateLimitMiddleware, signupRateLimitMiddleware, validationMiddleware } from '../../../Middlewares'
-import { ConfirmEmailValidator, RefreshTokenValidator, SignInValidator, SignUpValidator } from '../../../Validators'
+import { ConfirmEmailValidator, RefreshTokenValidator, SignInValidator, SignOutValidator, SignUpValidator } from '../../../Validators'
 const authController = Router()
 
 authController.post('/signup', signupRateLimitMiddleware, validationMiddleware(SignUpValidator), AuthService.signUp)
@@ -12,6 +12,6 @@ authController.post('/signin', signinRateLimitMiddleware, validationMiddleware(S
 
 authController.post('/refresh-token', validationMiddleware(RefreshTokenValidator), AuthService.refreshToken)
 
-authController.post('/signout', authentication, AuthService.signOut)
+authController.post('/signout', authentication, validationMiddleware(SignOutValidator), AuthService.signOut)
 
 export { authController }

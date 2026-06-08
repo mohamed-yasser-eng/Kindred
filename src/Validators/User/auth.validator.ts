@@ -56,4 +56,10 @@ export const RefreshTokenValidator = {
   }).passthrough(),
 }
 
+export const SignOutValidator = {
+  body: z.strictObject({
+    refreshToken: z.string().min(1),
+  }),
+}
+
 export { objectId }
