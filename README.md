@@ -9,7 +9,7 @@
 <!-- ════════════════════════════════════════════════════════════════ -->
 
 <p align="center">
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO">
+  <a href="https://github.com/mohamed-sangak/Kindred">
     <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1000&color=58A6FF&center=true&vCenter=true&width=620&lines=Three+API+surfaces%2C+one+domain+core.;REST+%2B+GraphQL+%2B+WebSocket+over+TypeScript.;MongoDB+%C2%B7+Redis+%C2%B7+S3+%E2%80%94+layered+%26+strict." alt="Typing SVG" />
   </a>
 </p>
@@ -35,7 +35,7 @@
 
 ---
 
-A social-networking backend in TypeScript that serves three coordinated API surfaces — **REST**, **GraphQL**, and **WebSocket** — over one shared domain core (MongoDB + Redis + S3).
+A community networking backend in TypeScript that serves three coordinated API surfaces — **REST**, **GraphQL**, and **WebSocket** — over one shared domain core (MongoDB + Redis + S3).
 
 <!-- ════════════════════════════════════════════════════════════════ -->
 <!--  TECH STACK ICONS                                                  -->
@@ -119,7 +119,6 @@ npm run dev              # watch mode (nodemon)
 ### Configuration
 `src/Config/env.config.ts` validates the whole environment with Zod at startup and **exits if any variable is missing or invalid** — the app won't boot half-configured. Key constraints: `ENCRYPTION_SECRET_KEY` must be exactly 32 chars, `JWT_PREFIX` must be `Bearer`.
 
-> **Note:** the env schema also requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASS`, which are not yet in `.env.example` — add them when filling your `.env`.
 
 ### Docker
 ```bash
@@ -167,7 +166,6 @@ BE/src/
 
 ---
 
-## 🏗 Engineering & Architecture
 
 A closer look at how the system is built — each item ties to the real files and, where relevant, the trade-off behind the decision.
 
